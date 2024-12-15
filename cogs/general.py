@@ -2,7 +2,7 @@ import interactions
 from interactions import Extension, SlashContext, slash_command, check
 
 
-def is_authed(ctx: SlashContext):
+def is_authed():
     # TODO: Check if the user is authed for the group they're attempting to 'edit'
     return True
 

@@ -1,7 +1,7 @@
 # models/submissions/drop.py
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String
 from sqlalchemy.orm import relationship
-from sqlalchemy import func
+from sqlalchemy import func, event
 from ..base import Base, get_current_partition
 
 class Drop(Base):
@@ -28,3 +28,10 @@ class Drop(Base):
     
     player = relationship("Player", back_populates="drops")
     notified_drops = relationship("NotifiedSubmission", back_populates="drop")
+
+
+@event.listens_for(Drop, 'after_insert')
+def after_drop_insert(mapper, connection, target):
+    print(f"Drop {target.drop_id} created successfully")
+    ## Now we can update the player's total in the various contexts.
+    ## We can also check the drop against requirements for notifications to be sent.
