@@ -1,9 +1,10 @@
+import asyncio
 import interactions
-from interactions.api.events import MessageCreate, InteractionCreate, Ready
+from interactions.api.events import MessageCreate, InteractionCreate, Ready, Startup
 from interactions import listen
 from dotenv import load_dotenv
 import os
-from events import on_message_create, on_interaction, on_ready
+from events import on_message_event, on_interaction_event, on_bot_ready
 
 load_dotenv()
 
@@ -12,17 +13,20 @@ bot = interactions.Client(token=os.getenv("DISCORD_TOKEN"))
 ## Event Listeners ##
 @listen(MessageCreate)
 async def on_message_create(event: MessageCreate):
-    await on_message_create(event)
+    await on_message_event(event)
 
 @listen(InteractionCreate)
 async def on_interaction(event: InteractionCreate):
-    await on_interaction(event)
+    await on_interaction_event(event)
 
-@listen(Ready)
-async def on_ready(event: Ready):
-    await on_ready(event)
+@listen(Startup)
+async def on_startup(event: Startup):
+    await on_bot_ready(event)
 
+
+async def main():
+    await bot.astart()
+    
 
 if __name__ == "__main__":
-    print("Starting up...")
-    bot.start()
+    asyncio.run(main())
