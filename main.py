@@ -5,6 +5,7 @@ from interactions import listen
 from dotenv import load_dotenv
 import os
 from events import on_message_event, on_interaction_event, on_bot_ready
+from models import Base, Session, engine
 
 load_dotenv()
 
