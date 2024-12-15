@@ -14,9 +14,6 @@ bot = interactions.Client(token=os.getenv("DISCORD_TOKEN"), intents=intents)
 ## Event Listeners ##
 @listen(MessageCreate)
 async def on_message_create(event: MessageCreate):
-    # Debug the event before passing it
-    
-    # Pass the event directly instead of wrapping it
     await on_message_event(event)
 
 @listen(InteractionCreate)
