@@ -15,9 +15,6 @@ bot = interactions.Client(token=os.getenv("DISCORD_TOKEN"), intents=intents)
 @listen(MessageCreate)
 async def on_message_create(event: MessageCreate):
     # Debug the event before passing it
-    print("Raw event data:", event.__dict__)
-    print("Message content:", event.message.content if hasattr(event.message, 'content') else None)
-    print("Message embeds:", event.message.embeds if hasattr(event.message, 'embeds') else None)
     
     # Pass the event directly instead of wrapping it
     await on_message_event(event)
