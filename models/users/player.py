@@ -1,5 +1,5 @@
 # models/users/player.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, event
 from sqlalchemy.orm import relationship
 from ..base import Base
 from ..associations import user_group_association
@@ -40,3 +40,7 @@ class Player(Base):
         if not existing_association:
             self.groups.append(group)
             session.commit()
+
+@event.listens_for(Player, 'after_insert')
+def after_player_insert(mapper, connection, target):
+    print(f"Player {target.player_id} created successfully")
