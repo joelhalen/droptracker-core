@@ -65,9 +65,14 @@ async def print_stats():
         await asyncio.sleep(0.05)
 
 async def on_message_event(event: MessageCreate):
+    """
+        Gets called every time a message is created in any guild the bot is a member of.
+        All incoming submissions are received through messages in Discord, using webhooks.
+    """
     message = event.message
     
     if not message.webhook_id:
+        ## We only need to look for messages with attached webhook ids.
         return
         
     if message.channel.parent_id and is_valid(int(message.channel.parent_id)):

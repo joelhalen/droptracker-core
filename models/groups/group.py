@@ -37,6 +37,13 @@ class Group(Base):
             session.commit()
 
 @event.listens_for(Group, 'after_insert')    
-def after_group_insert(mapper, connection, target):
-    print(f"Group {target.group_id} created successfully")
+def after_group_insert(mapper, connection, target: Group) -> None:
+    """Event listener for group creation
+    
+    Args:
+        mapper: The Mapper object
+        connection: The Connection object
+        target (Group): The newly created Group instance
+    """
+    print(f"Group {target.group_id} has been created successfully")
     

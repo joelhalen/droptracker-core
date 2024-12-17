@@ -243,3 +243,9 @@ class PlayerStatsCache:
                 bosses[npc_id] = {}
             bosses[npc_id][stat_type] = int(value)
         return bosses
+    
+class GroupStatsCache:
+    def __init__(self):
+        self.cache_ttl = 3600  # 1 hour cache TTL
+
+
