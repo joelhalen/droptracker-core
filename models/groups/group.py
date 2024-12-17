@@ -1,8 +1,11 @@
 # models/groups/group.py
-from sqlalchemy import Column, Integer, String, DateTime, func
+from sqlalchemy import Column, Integer, String, DateTime, func, event
 from sqlalchemy.orm import relationship
 from ..base import Base
 from ..associations import user_group_association
+from cache.stats import StatsCache
+
+cache = StatsCache()
 
 class Group(Base):
     """
@@ -32,3 +35,8 @@ class Group(Base):
         if not existing_association:
             self.players.append(player)
             session.commit()
+
+@event.listens_for(Group, 'after_insert')    
+def after_group_insert(mapper, connection, target):
+    print(f"Group {target.group_id} created successfully")
+    
