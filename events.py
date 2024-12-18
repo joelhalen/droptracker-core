@@ -40,12 +40,12 @@ class StatsTracker:
         
         # Move cursor up 7 lines, return to start, and clear each line
         return f"\033[7F\r" + f"""Status Report\033[K
-Runtime: {runtime.days}d {runtime.seconds//3600}h {(runtime.seconds//60)%60}m {runtime.seconds%60}s\033[K
-Total Requests: {self.drops + self.logs + self.achievements + self.pbs}\033[K
-Drops: {self.drops} ({self.drops/minutes:.2f}/min, {self.drops/hours:.2f}/hr)\033[K
-Logs: {self.logs} ({self.logs/minutes:.2f}/min, {self.logs/hours:.2f}/hr)\033[K
-Achievements: {self.achievements} ({self.achievements/minutes:.2f}/min, {self.achievements/hours:.2f}/hr)\033[K
-Personal Bests: {self.pbs} ({self.pbs/minutes:.2f}/min, {self.pbs/hours:.2f}/hr)\033[K"""
+            Runtime: {runtime.days}d {runtime.seconds//3600}h {(runtime.seconds//60)%60}m {runtime.seconds%60}s\033[K
+            Total Requests: {self.drops + self.logs + self.achievements + self.pbs}\033[K
+            Drops: {self.drops} ({self.drops/minutes:.2f}/min, {self.drops/hours:.2f}/hr)\033[K
+            Logs: {self.logs} ({self.logs/minutes:.2f}/min, {self.logs/hours:.2f}/hr)\033[K
+            Achievements: {self.achievements} ({self.achievements/minutes:.2f}/min, {self.achievements/hours:.2f}/hr)\033[K
+            Personal Bests: {self.pbs} ({self.pbs/minutes:.2f}/min, {self.pbs/hours:.2f}/hr)\033[K"""
 
 # Create global stats tracker
 stats = StatsTracker()
