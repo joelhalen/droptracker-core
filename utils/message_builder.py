@@ -1,7 +1,7 @@
 import interactions
 from interactions import Embed, Button, ButtonStyle, InteractionType, Message, SlashContext
 
-def build_default(title: str, description: str):
+def build_default(title: str, description: str, thumb: bool = True):
     """
         Builds a default embed with the DropTracker logo and footer
     """
@@ -15,5 +15,7 @@ def build_default(title: str, description: str):
         icon_url="https://joelhalen.github.io/droptracker-small.gif"
     )
     embed.set_footer("Powered by the DropTracker | https://www.droptracker.io/")
+    if thumb:
+        embed.set_thumbnail(url="https://joelhalen.github.io/droptracker-small.gif")
     return embed
 

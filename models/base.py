@@ -13,6 +13,8 @@ load_dotenv()
 Base = declarative_base()
 DB_USER = os.getenv("DB_USER")
 DB_PASS = os.getenv("DB_PASS")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
 
 def get_current_partition() -> int:
     """
@@ -23,7 +25,7 @@ def get_current_partition() -> int:
     return now.year * 100 + now.month
 
 # Setup database connection and create tables
-engine = create_engine(f'mysql+pymysql://{DB_USER}:{DB_PASS}@localhost:3306/data', 
+engine = create_engine(f'mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/data', 
                       pool_size=20, max_overflow=10)
 Base.metadata.create_all(engine)
 Session = scoped_session(sessionmaker(bind=engine))
