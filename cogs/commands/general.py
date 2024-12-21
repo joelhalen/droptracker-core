@@ -1,9 +1,11 @@
+from typing import List
 import interactions
 from interactions import Extension, SlashContext, slash_command, check
 from models import Player, Group, User
 from models.base import session
 from utils.message_builder import build_default
 from utils.misc import get_command_id
+from cache import redis_client
 
 def is_authed():
     # TODO: Check if the user is authed for the group they're attempting to 'edit'
@@ -22,11 +24,11 @@ def is_registered(ctx: SlashContext):
 
 class UserCommands(Extension):
     @slash_command(name="ping", description="Ping the bot")
-    async def ping(self, ctx: SlashContext):
+    async def ping(self, ctx: SlashContext) -> None:
         await ctx.send("Pong!")
 
     @slash_command(name="register", description="Register your account in the DropTracker database")
-    async def register(self, ctx: SlashContext):
+    async def register(self, ctx: SlashContext) -> None:
         if is_registered(ctx):
             embed = build_default(":warning: Error :warning:", f"Your account is already registered in the DropTracker database.")
             return await ctx.send(embed=embed)
@@ -37,10 +39,7 @@ class UserCommands(Extension):
         return await ctx.send(embed=embed)
 
 class GroupCommands(Extension):
-    @slash_command(name="group", description="Group commands")
-    async def group(self, ctx: SlashContext):
-        await ctx.send("Group commands")
-
+    
     @slash_command(name="create-group", description="Register your group in the DropTracker database (requires a WOM ID)",
                    default_member_permissions=interactions.Permissions.ADMINISTRATOR)
     async def create_group(self, ctx: SlashContext, group_name: str, wom_id: int):
@@ -67,6 +66,8 @@ class GroupCommands(Extension):
                         f"Wise Old Man Group ID: {wom_id}\n" +
                         f"DropTracker Group ID: {group.group_id}\n" +
                         f"Discord Guild ID: {guild_id}\n",inline=False)
+        
+        await redis_client.set(f"{group.group_id}:created", f"{ctx.author.id}", ex=900)
         return await ctx.send(embed=embed)
 
     @slash_command(name="delete", description="Delete your primary group from our database entirely.",

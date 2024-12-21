@@ -3,15 +3,17 @@ from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import func, event
 from ..base import Base, get_current_partition
+#from cache.stats import PlayerStatsCache
+#cache = PlayerStatsCache()
 
 class Drop(Base):
     """
-    :param: item_id
-    :param: player_id
-    :param: npc_id
-    :param: value
-    :param: quantity
-    :param: image_url (nullable)
+        :param: item_id
+        :param: player_id
+        :param: npc_id
+        :param: value
+        :param: quantity
+        :param: image_url (nullable)
     """
     __tablename__ = 'drops'
     drop_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -35,3 +37,5 @@ def after_drop_insert(mapper, connection, target):
     print(f"Drop {target.drop_id} created successfully")
     ## Now we can update the player's total in the various contexts.
     ## We can also check the drop against requirements for notifications to be sent.
+    #cache.update_player_total(target.player_id, "drops")
+

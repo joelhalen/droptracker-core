@@ -3,9 +3,9 @@ from sqlalchemy import Column, Integer, String, DateTime, func, event
 from sqlalchemy.orm import relationship
 from ..base import Base
 from ..associations import user_group_association
-from cache.stats import StatsCache
+from cache.player_stats import PlayerStatsCache
 
-cache = StatsCache()
+cache = PlayerStatsCache()
 
 class Group(Base):
     """
