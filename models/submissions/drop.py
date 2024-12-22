@@ -1,10 +1,10 @@
 # models/submissions/drop.py
+import asyncio
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import func, event
-from ..base import Base, get_current_partition
-#from cache.stats import PlayerStatsCache
-#cache = PlayerStatsCache()
+from utils.misc import get_current_partition, get_player_cache
+from ..base import Base
 
 class Drop(Base):
     """
@@ -33,9 +33,10 @@ class Drop(Base):
 
 
 @event.listens_for(Drop, 'after_insert')
-def after_drop_insert(mapper, connection, target):
+def after_drop_insert(mapper, connection, target: Drop):
+    """Synchronous event handler for drop insertions"""
     print(f"Drop {target.drop_id} created successfully")
-    ## Now we can update the player's total in the various contexts.
-    ## We can also check the drop against requirements for notifications to be sent.
-    #cache.update_player_total(target.player_id, "drops")
-
+    player_cache = get_player_cache(target.player_id)
+    player_cache.update_player_stats(target)
+    # player_cache.rebuild_cache_sync()  # Use sync version
+    print(f"Player stats updated for player {target.player_id}")

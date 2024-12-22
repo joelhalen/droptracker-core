@@ -1,8 +1,11 @@
 from datetime import datetime
+from typing import List, Optional
 import interactions
 from interactions import Embed, Button, ButtonStyle, InteractionType, Message, SlashContext
 
+from models import Log
 from utils.num import format_number
+
 
 def build_default(title: str, description: str, thumb: bool = True):
     """
@@ -72,3 +75,86 @@ def create_metrics_embed(metrics: dict) -> Embed:
     )
     
     return embed
+
+async def create_log_embed(
+    logs: List[Log], 
+    source: Optional[str] = None, 
+    level: Optional[str] = None,
+    limit: int = 100
+) -> List[Embed]:
+    """
+    Create formatted embeds for log display
+    
+    Args:
+        logs: List of Log objects to format
+        source: Optional source to filter logs by (e.g. 'check_player')
+        level: Optional level to filter logs by (e.g. 'ERROR', 'INFO')
+        limit: Maximum number of logs to display (default 100)
+        
+    Returns:
+        List of Embed objects containing formatted logs
+    """
+    embeds = []
+    current_embed = Embed(
+        title="DropTracker logs",
+        color=0x00ff00
+    )
+    
+    # Filter logs based on parameters
+    filtered_logs = logs
+    if source:
+        filtered_logs = [log for log in filtered_logs if log.source == source]
+    if level:
+        filtered_logs = [log for log in filtered_logs if log.level == level.upper()]
+    
+    # Apply limit after filtering
+    filtered_logs = filtered_logs[-limit:]
+    
+    # Add filter info to first embed
+    filter_text = []
+    if source:
+        filter_text.append(f"Source: `{source}`")
+    if level:
+        filter_text.append(f"Level: `{level.upper()}`")
+    if filter_text:
+        current_embed.description = "Filtered by: " + " | ".join(filter_text)
+    
+    for log in filtered_logs:
+        log_message = (
+            f"**Level:** `{log.level}`\n"
+            f"**Source:** `{log.source}`\n"
+            f"**Message:** `{log.message}`\n"
+        )
+        
+        # Only add details if they exist
+        if log.details:
+            log_message += f"**Details:** ```{log.details}```\n"
+            
+        log_message += f"**Timestamp:** <t:{log.timestamp}:R>"
+        
+        if len(current_embed.fields) < 25:  # Discord limit for fields in an embed
+            current_embed.add_field(
+                name=f"Log #{log.id}",
+                value=log_message,
+                inline=False
+            )
+        else:
+            embeds.append(current_embed)
+            current_embed = Embed(
+                title="DropTracker logs",
+                color=0x00ff00
+            )
+            current_embed.add_field(
+                name=f"Log #{log.id}",
+                value=log_message,
+                inline=False
+            )
+    
+    if current_embed.fields:  # If there are any fields in the last embed
+        embeds.append(current_embed)
+        
+    # Add page numbers
+    for i, embed in enumerate(embeds):
+        embed.set_footer(text=f"Page {i+1}/{len(embeds)}")
+    
+    return embeds

@@ -17,11 +17,11 @@ stats = StatsTracker()
 
 class MetricsTracker:
     _instance = None
+    _initialized = False
     
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(MetricsTracker, cls).__new__(cls)
-            cls._instance._initialized = False
         return cls._instance
     
     def __init__(self):
@@ -34,25 +34,65 @@ class MetricsTracker:
         self._pending_snapshots = []
         self._snapshot_lock = asyncio.Lock()
         self._last_snapshot = 0
+        self._last_metrics = {
+            'drops': 0,
+            'collections': 0,
+            'pbs': 0,
+            'achievements': 0,
+            'missed': 0,
+            'total': 0
+        }
         self.snapshot_interval = 5
         self._initialized = True
+    
+    async def _snapshot_loop(self):
+        """Periodically save snapshots to database with delta values"""
+        while True:
+            try:
+                current_time = int(time.time())
+                if current_time - self._last_snapshot >= self.snapshot_interval:
+                    # Calculate deltas
+                    current_metrics = {
+                        'drops': stats.drops,
+                        'collections': stats.logs,
+                        'pbs': stats.pbs,
+                        'achievements': stats.achievements,
+                        'missed': stats.denied,
+                        'total': stats.drops + stats.logs + stats.pbs + stats.achievements
+                    }
+                    
+                    deltas = {
+                        key: current_metrics[key] - self._last_metrics[key]
+                        for key in current_metrics
+                    }
+                    
+                    snapshot = MetricSnapshot(
+                        drops=deltas['drops'],
+                        collections=deltas['collections'],
+                        pbs=deltas['pbs'],
+                        achievements=deltas['achievements'],
+                        missed=deltas['missed'],
+                        total=deltas['total'],
+                        timestamp=current_time
+                    )
+                    
+                    session.add(snapshot)
+                    try:
+                        session.commit()
+                        self._last_snapshot = current_time
+                        self._last_metrics = current_metrics  # Update last metrics after successful commit
+                    except Exception as e:
+                        print(f"Error committing snapshot: {e}")
+                        session.rollback()
+                        
+            except Exception as e:
+                print(f"Error in snapshot loop: {e}")
+            await asyncio.sleep(1)
     
     async def initialize(self):
         """Initialize async components"""
         if not hasattr(self, '_snapshot_task'):
             self._snapshot_task = asyncio.create_task(self._snapshot_loop())
-    
-    async def _snapshot_loop(self):
-        """Periodically save snapshots to database"""
-        while True:
-            try:
-                current_time = int(time.time())
-                if current_time - self._last_snapshot >= self.snapshot_interval:
-                    await self._save_pending_snapshots()
-                    self._last_snapshot = current_time
-            except Exception as e:
-                print(f"Error in snapshot loop: {e}")
-            await asyncio.sleep(1)
     
     async def _create_snapshot(self):
         """Create a new snapshot of current metrics"""
@@ -165,40 +205,74 @@ class MetricsTracker:
         }
     
     async def get_metrics(self, metric_type: str) -> Dict:
-        """Get comprehensive metrics for all time scales"""
-        runtime = stats.get_runtime()
-        minutes = runtime / 60
-        hours = minutes / 60
+        """Get comprehensive metrics with Redis caching"""
+        current_time = int(time.time())
+        cache_key = f"metrics:{metric_type}:cached_data"
         
-        # Get count from StatsTracker
-        count = getattr(stats, metric_type, 0)
+        # Try to get cached data first
+        cached_data = redis_client.get(cache_key)
+        if cached_data:
+            return json.loads(cached_data)
         
-        metrics = {
+        # Calculate metrics if not cached
+        minutes_in_hour = min(60, (current_time - stats.start_time) / 60)
+        hours_in_day = min(24, (current_time - stats.start_time) / 3600)
+        
+        # Get counts from StatsTracker timestamps for accuracy
+        hourly_count = len([ts for ts in stats.timestamps[metric_type] 
+                           if ts >= current_time - 3600])
+        daily_count = len([ts for ts in stats.timestamps[metric_type] 
+                          if ts >= current_time - 86400])
+        
+        # Get historical data with a single query
+        cutoff = current_time - (24 * 3600)
+        snapshots = session.query(MetricSnapshot)\
+            .filter(MetricSnapshot.timestamp >= cutoff)\
+            .order_by(MetricSnapshot.timestamp.desc())\
+            .all()
+        
+        # Process historical data
+        hour_buckets = [0] * 24
+        for snapshot in snapshots:
+            hour_index = (current_time - snapshot.timestamp) // 3600
+            if hour_index < 24:
+                match metric_type:
+                    case 'drops': count = snapshot.drops
+                    case 'logs': count = snapshot.collections
+                    case 'achievements': count = snapshot.achievements
+                    case 'pbs': count = snapshot.pbs
+                    case 'denied': count = snapshot.missed
+                    case _: count = 0
+                hour_buckets[hour_index] += count
+        
+        metrics_data = {
             "total": {
-                "count": count,
-                "avg_per_hour": count / hours if hours > 0 else 0,
+                "count": getattr(stats, metric_type, 0),
+                "avg_per_hour": daily_count / hours_in_day if hours_in_day > 0 else 0,
             },
             "current": {
-                "hourly": count,
-                "daily": count,
-                "monthly": count
+                "hourly": hourly_count,
+                "daily": daily_count,
+                "monthly": getattr(stats, metric_type, 0)
             },
             "rolling": {
                 "last_hour": {
-                    "count": count,
-                    "avg_per_minute": count / 60 if minutes > 0 else 0
+                    "count": hourly_count,
+                    "avg_per_minute": hourly_count / minutes_in_hour if minutes_in_hour > 0 else 0
                 },
                 "last_day": {
-                    "count": count,
-                    "avg_per_hour": count / 24 if hours > 0 else 0
+                    "count": daily_count,
+                    "avg_per_hour": daily_count / hours_in_day if hours_in_day > 0 else 0
                 }
             },
             "historical": {
-                "hourly": self.get_hourly_data(metric_type)
+                "hourly": list(reversed(hour_buckets))
             }
         }
         
-        return metrics
+        # Cache the result for 1 minute
+        redis_client.setex(cache_key, 60, json.dumps(metrics_data))
+        return metrics_data
     
     def _calculate_average(self, count: int, start_time: datetime) -> float:
         """Calculate average per hour since start time"""
@@ -228,25 +302,31 @@ class MetricsTracker:
         return metrics_data 
     
     def get_hourly_data(self, metric_type: str, hours: int = 24) -> List[int]:
-        """Get hourly counts from database snapshots"""
-        cutoff = int(time.time()) - (hours * 3600)
+        """Get hourly counts from database snapshots with optimized querying"""
+        current_time = int(time.time())
+        cutoff = current_time - (hours * 3600)
+        
+        # Get snapshots for the last 24 hours with a single optimized query
         snapshots = session.query(MetricSnapshot)\
             .filter(MetricSnapshot.timestamp >= cutoff)\
-            .order_by(MetricSnapshot.timestamp.asc())\
+            .order_by(MetricSnapshot.timestamp.desc())\
             .all()
         
-        # Group by hour
+        # Initialize buckets for each hour
         hour_buckets = [0] * hours
+        
+        # Group snapshots by hour
         for snapshot in snapshots:
-            hour_diff = (int(time.time()) - snapshot.timestamp) // 3600
-            if hour_diff < hours:
+            hour_index = (current_time - snapshot.timestamp) // 3600
+            if hour_index < hours:
                 match metric_type:
                     case 'drops': count = snapshot.drops
                     case 'logs': count = snapshot.collections
                     case 'achievements': count = snapshot.achievements
                     case 'pbs': count = snapshot.pbs
                     case 'denied': count = snapshot.missed
-                hour_buckets[hour_diff] += count
+                    case _: count = 0
+                hour_buckets[hour_index] += count
         
         return list(reversed(hour_buckets))
     

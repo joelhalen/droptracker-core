@@ -1,16 +1,20 @@
 # models/users/player.py
+import asyncio
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, event
 from sqlalchemy.orm import relationship
+
+from cache.player_stats import PlayerStatsCache
+from utils.misc import get_player_cache
 from ..base import Base
 from ..associations import user_group_association
 
 class Player(Base):
     """ 
-    :param: wom_id: The player's WiseOldMan ID
-    :param: player_name: The DISPLAY NAME of the player, exactly as it appears
-    :param: user_id: The ID of the associated User object, if one exists
-    :param: log_slots: Stored number of collected log slots
-    :param: total_level: Account total level based on the last update with WOM.
+        :param: wom_id: The player's WiseOldMan ID
+        :param: player_name: The DISPLAY NAME of the player, exactly as it appears
+        :param: user_id: The ID of the associated User object, if one exists
+        :param: log_slots: Stored number of collected log slots
+        :param: total_level: Account total level based on the last update with WOM.
     """
     __tablename__ = 'players'
     player_id = Column(Integer, primary_key=True, autoincrement=True, index=True)
@@ -42,5 +46,7 @@ class Player(Base):
             session.commit()
 
 @event.listens_for(Player, 'after_insert')
-def after_player_insert(mapper, connection, target):
-    print(f"Player {target.player_id} created successfully")
+def after_player_insert(mapper, connection, target: Player):
+    """Synchronous event handler for player insertions"""
+    player_cache = get_player_cache(target.player_id)
+    player_cache.rebuild_cache_sync()  # Use sync version directly

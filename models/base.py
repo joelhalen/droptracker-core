@@ -22,13 +22,7 @@ else:
     DB_HOST = os.getenv("DB_HOST")
     DB_PORT = os.getenv("DB_PORT")
 
-def get_current_partition() -> int:
-    """
-    Returns the naming scheme for a partition of drops
-    Based on the current month
-    """
-    now = datetime.now()
-    return now.year * 100 + now.month
+
 
 # Setup database connection and create tables
 engine = create_engine(f'mysql+pymysql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/data', 
