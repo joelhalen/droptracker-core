@@ -22,7 +22,11 @@ The project is organized into several directories:
 
 ## Current list of to-dos:
 
-- [ ] Finalize methods of tracking loot accurately and efficiently with `cache/player_stats.py`.
-- [ ] Implement proper leaderboards for personal bests at various bosses.
-- [ ] Create command-based configuration structure for groups to set their servers up.
+- [x] Re-integrate lootboard generation with group-specific and time-based partitioning.
+> Allows for lootboards from *previous months* to be generated as well.
+- [ ] Create commands to interact with the bot and create/configure groups.
+- [ ] Implement a leaderboard system based on boss personal bests.
+- [ ] Implement a system for sending notifications based on submissions that exceed group thresholds.
+- [ ] Stress-test the system to determine an estimated amount of memory and CPU usage under maximum load (we have 12GB maximum on our machine).
+- [ ] Further refine the logging and management system for debugging and inspection purposes.
 
