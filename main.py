@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 import os
 from cache.metrics import MetricsTracker
 from events import on_message_event, on_interaction_event, on_bot_ready
-from utils.message_builder import create_metrics_embed
+from utils.message_builder import create_metrics_embed, generate_lootboard_embed
 import multiprocessing
 from hypercorn.asyncio import serve
 from cogs.images import lootboard
@@ -36,6 +36,7 @@ def run_discord_bot():
         update_metrics.start()
         await update_metrics()
         await on_bot_ready(e)
+        await update_lootboard()
 
     @Task.create(IntervalTrigger(seconds=60))
     async def update_metrics():
@@ -54,9 +55,10 @@ def run_discord_bot():
             print(f"Error updating metrics message: {e}")
 
     async def update_lootboard():
-        embed = await lootboard.board_generator(1)
+        image_path, total_players = await lootboard.board_generator(1)
         channel = await bot.fetch_channel(1210765311498788865)
-        await channel.send("Lootboard test", embed=embed)
+        embed = await generate_lootboard_embed(total_players)
+        await channel.send("Lootboard test", file=image_path, embed=embed)
 
     bot.start()
 

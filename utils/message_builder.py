@@ -160,7 +160,7 @@ async def create_log_embed(
     return embeds
 
 
-async def generate_lootboard_embed(board_data: Dict) -> Embed:
+async def generate_lootboard_embed(total_players: int) -> Embed:
     """
     Generate a leaderboard embed
     """
@@ -171,7 +171,7 @@ async def generate_lootboard_embed(board_data: Dict) -> Embed:
         color=0x00ff00
     )
     embed.add_field(name="Refreshes", value=f"<t:{int(ten_minutes_from_now)}:R>", inline=True)
-    embed.add_field(name="Members tracked:", value=f"{len(board_data['player_totals'])}", inline=True)
+    embed.add_field(name="Members tracked:", value=f"{total_players}", inline=True)
     embed.add_field(name="Sign up!", value=f"Use the `/claim-rsn` command & install [our plugin](https://www.github.com/joelhalen/droptracker-plugin)", inline=True)
     embed.set_footer(text="Powered by the DropTracker | https://www.droptracker.io/")
     embed.set_thumbnail(url="https://joelhalen.github.io/droptracker-small.gif")

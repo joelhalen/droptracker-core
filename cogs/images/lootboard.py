@@ -52,12 +52,15 @@ class LootboardGenerator:
         
     async def _generate_board_image(self, data: Dict, group: Group = None) -> str:
         """Generate the actual board image"""
-        bg_img, draw = self._load_background_image("assets/img/bank-new-clean-dark.png")
+        bg_img, draw = self._load_background_image("assets/img/lootboards/dark.png")
+        
+        # Calculate total loot
+        total_loot = sum(data['player_totals'].values())
         
         # Draw all sections
-        bg_img = await self._draw_headers(bg_img, draw, group.group_name if group else None, data)
+        bg_img = await self._draw_headers(bg_img, draw, group, total_loot)
         bg_img = await self._draw_items(bg_img, draw, data)
-        bg_img = await self._draw_leaderboard(bg_img, draw, data)
+        bg_img = await self._draw_leaderboard(bg_img, draw, data['player_totals'])
         
         # Save and return path
         group_id = group.group_id if group else 0
@@ -123,6 +126,128 @@ class LootboardGenerator:
         
         return centered
 
+    async def _draw_headers(self, bg_img: Image.Image, draw: ImageDraw.ImageDraw, 
+                           group: Group, total_loot: int) -> Image.Image:
+        """Draw the header section of the board"""
+        current_month = datetime.now().month
+        month_string = calendar.month_name[current_month].capitalize()
+        this_month = format_number(total_loot)
+        
+        if not group or group.group_id == 2:
+            title = f"Tracked Drops - All Players ({month_string}) - {this_month}"
+        else:
+            title = f"{group.group_name}'s Tracked Drops for {month_string} ({this_month})"
+
+        # Calculate text size and center
+        bbox = draw.textbbox((0, 0), title, font=self.main_font)
+        text_width = bbox[2] - bbox[0]
+        bg_img_w, _ = bg_img.size
+        head_loc_x = int((bg_img_w - text_width) / 2)
+        head_loc_y = 20
+        
+        draw.text((head_loc_x, head_loc_y), title, font=self.main_font, 
+                  fill=self.yellow, stroke_width=2, stroke_fill=self.black)
+        return bg_img
+
+    async def _draw_items(self, bg_img: Image.Image, draw: ImageDraw.ImageDraw, 
+                         data: Dict) -> Image.Image:
+        """Draw the items grid section"""
+        locations = {}
+        
+        # Load item positions from CSV
+        with open("data/item-mapping.csv", 'r') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for i, row in enumerate(reader):
+                locations[i] = row
+        
+        # Combine all items from all players
+        all_items = defaultdict(lambda: {'quantity': 0, 'value': 0})
+        for player_items in data['player_items'].values():
+            for item in player_items:
+                item_id = item['item_id']
+                all_items[item_id]['quantity'] += item['quantity']
+                all_items[item_id]['value'] += item['value']
+        
+        # Sort items by total value and take top 32
+        sorted_items = sorted(all_items.items(), 
+                             key=lambda x: x[1]['value'], 
+                             reverse=True)[:32]
+        
+        for i, (item_id, item_data) in enumerate(sorted_items):
+            if i >= len(locations):
+                break
+            
+            current_pos_x = int(locations[i]['x'])
+            current_pos_y = int(locations[i]['y'])
+            
+            # Load and draw item image
+            item_img = await self._load_item_image(item_id)
+            if not item_img:
+                continue
+            
+            # Resize and center image
+            item_img_resized = item_img.resize(
+                (round(item_img.width * 1.1), 
+                 round(item_img.height * 1.1)), 
+                Image.Resampling.LANCZOS
+            )
+            fixed_img = self._resize_and_center_image(item_img_resized, 75, 75)
+            bg_img.paste(fixed_img, (current_pos_x - 5, current_pos_y - 12), fixed_img)
+            
+            # Draw quantity and value
+            quantity_str = format_number(int(item_data['quantity']))
+            value_str = format_number(item_data['value'])
+            
+            draw.text((current_pos_x + 1, current_pos_y - 10), quantity_str,
+                     font=self.amt_font, fill=self.yellow, 
+                     stroke_width=2, stroke_fill=self.black)
+            draw.text((current_pos_x + 1, current_pos_y + 35), value_str,
+                     font=self.small_font, fill=self.yellow,
+                     stroke_width=1, stroke_fill=self.black)
+        
+        return bg_img
+
+    async def _draw_leaderboard(self, bg_img: Image.Image, draw: ImageDraw.ImageDraw, 
+                              player_totals: Dict) -> Image.Image:
+        """Draw the leaderboard section"""
+        # Sort players by total loot value
+        top_players = sorted(player_totals.items(), key=lambda x: x[1], reverse=True)[:12]
+        
+        name_x, name_y = 141, 228
+        first_name = True
+        
+        for i, (player_id, total) in enumerate(top_players):
+            # Get player name from database
+            player_obj = session.query(Player.player_name).filter(
+                Player.player_id == player_id).first()
+            player_name = player_obj.player_name if player_obj else "Unknown"
+            
+            # Format texts
+            rank_text = f'{i + 1}'
+            value_text = format_number(total)
+            
+            # Calculate positions
+            rank_x = name_x - 104
+            value_x = name_x + 106
+            
+            # Center each text element
+            rank_bbox = draw.textbbox((0, 0), rank_text, font=self.small_font)
+            name_bbox = draw.textbbox((0, 0), player_name, font=self.small_font)
+            value_bbox = draw.textbbox((0, 0), value_text, font=self.small_font)
+            
+            rank_x = rank_x - (rank_bbox[2] - rank_bbox[0]) // 2
+            name_x_centered = name_x - (name_bbox[2] - name_bbox[0]) // 2
+            value_x = value_x - (value_bbox[2] - value_bbox[0]) // 2
+            
+            # Draw texts
+            draw.text((rank_x, name_y), rank_text, font=self.small_font, fill=self.yellow)
+            draw.text((name_x_centered, name_y), player_name, font=self.small_font, fill=self.yellow)
+            draw.text((value_x, name_y), value_text, font=self.small_font, fill=self.yellow)
+            
+            name_y += 22
+        
+        return bg_img
+
 async def get_lootboard_data(player_ids: List[int], partition: int = None) -> Dict:
     """
     Generate leaderboard data for a group of players for a specific month
@@ -149,10 +274,13 @@ async def get_lootboard_data(player_ids: List[int], partition: int = None) -> Di
         ]
     }
     """
-    if partition is None:
-        partition = get_partition(datetime.now())
+    partition, _ = get_partition(datetime.now())
         
-    # Changed to store items as a list that we'll sort later
+    # Convert partition to datetime object
+    year = partition // 100
+    month = partition % 100
+    partition_date = datetime(year, month, 1)
+        
     player_items = defaultdict(list)
     player_totals = defaultdict(int)
     
@@ -162,11 +290,11 @@ async def get_lootboard_data(player_ids: List[int], partition: int = None) -> Di
         if not cache:
             continue
             
-        # Get partition keys
-        partition_keys = cache._get_cache_keys(partition)
+        # Pass datetime object instead of partition number
+        partition_keys = cache._get_cache_keys(partition_date)
         
         # Get all items for this player in this partition
-        items_data = await redis_client.hgetall(partition_keys['items'])
+        items_data = redis_client.hgetall(partition_keys['items'])
         
         # Temporary storage for item data before sorting
         temp_items = defaultdict(lambda: {'quantity': 0, 'value': 0})
@@ -231,8 +359,8 @@ async def board_generator(group_wom_id, partition: int = None) -> str:
         group_members = [player.wom_id for player in session.query(Player.wom_id).all()]
     else:   
         group_members = await get_group_player_ids(group_wom_id)
-        
+    total_players = len(group_members)
     # drops = await get_lootboard_data(group_members, partition)
     generator = LootboardGenerator()
     logger.info("board_generator",f"Generating lootboard for group {group_wom_id}")
-    return await generator.generate_board(wom_group_id=group_wom_id)
+    return await generator.generate_board(wom_group_id=group_wom_id), total_players
