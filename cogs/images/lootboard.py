@@ -12,11 +12,12 @@ from interactions import Embed
 from utils.message_builder import generate_lootboard_embed
 from utils.misc import get_partition, get_player_cache
 from cache import redis_client
-from utils import wiseoldman
+from utils import logger, wiseoldman
 from utils.num import format_number
 from models import Player, Group, GroupConfiguration
 from models.base import session
-    
+
+logger = logger.Logger()
 class LootboardGenerator:
     def __init__(self):
         self.yellow = (255, 255, 0)
@@ -215,14 +216,7 @@ async def get_group_player_ids(group_wom_id: int) -> List[int]:
     return await wiseoldman.fetch_group_members(group_wom_id)
 
 
-async def get_group_leaderboard(group_wom_id: int) -> Dict:
-    """
-    Get a leaderboard for a specific group
-    """
-    player_ids = await get_group_player_ids(group_wom_id)
-    return await get_lootboard_data(player_ids)
-
-async def board_generator(group_wom_id, partition: int = None) -> Embed:
+async def board_generator(group_wom_id, partition: int = None) -> str:
     """
     Generate a leaderboard for a specific group based on the group's Wom ID
     
@@ -231,12 +225,14 @@ async def board_generator(group_wom_id, partition: int = None) -> Embed:
     partition: The partition to get data for
 
     Returns:
-    Embed: The leaderboard embed
+    str: The filepath to the generated lootboard image
     """
     if group_wom_id == 1:
         group_members = [player.wom_id for player in session.query(Player.wom_id).all()]
     else:   
         group_members = await get_group_player_ids(group_wom_id)
         
-    drops = await get_lootboard_data(group_members, partition)
-    return await generate_lootboard_embed(drops)
+    # drops = await get_lootboard_data(group_members, partition)
+    generator = LootboardGenerator()
+    logger.info("board_generator",f"Generating lootboard for group {group_wom_id}")
+    return await generator.generate_board(wom_group_id=group_wom_id)
