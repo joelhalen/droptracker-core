@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 import interactions
 from interactions import Embed, Button, ButtonStyle, InteractionType, Message, SlashContext
 
@@ -158,3 +158,21 @@ async def create_log_embed(
         embed.set_footer(text=f"Page {i+1}/{len(embeds)}")
     
     return embeds
+
+
+async def generate_lootboard_embed(board_data: Dict) -> Embed:
+    """
+    Generate a leaderboard embed
+    """
+    current_time = datetime.now()
+    ten_minutes_from_now = current_time.timestamp() + 600
+    embed = Embed(
+        title="Loot Leaderboard",
+        color=0x00ff00
+    )
+    embed.add_field(name="Refreshes", value=f"<t:{int(ten_minutes_from_now)}:R>", inline=True)
+    embed.add_field(name="Members tracked:", value=f"{len(board_data['player_totals'])}", inline=True)
+    embed.add_field(name="Sign up!", value=f"Use the `/claim-rsn` command & install [our plugin](https://www.github.com/joelhalen/droptracker-plugin)", inline=True)
+    embed.set_footer(text="Powered by the DropTracker | https://www.droptracker.io/")
+    embed.set_thumbnail(url="https://joelhalen.github.io/droptracker-small.gif")
+    return embed

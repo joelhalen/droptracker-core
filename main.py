@@ -10,6 +10,8 @@ from events import on_message_event, on_interaction_event, on_bot_ready
 from utils.message_builder import create_metrics_embed
 import multiprocessing
 from hypercorn.asyncio import serve
+from cogs.images import lootboard
+
 
 load_dotenv()
 intents = (interactions.Intents.ALL)
@@ -51,13 +53,21 @@ def run_discord_bot():
         except Exception as e:
             print(f"Error updating metrics message: {e}")
 
+    async def update_lootboard():
+        embed = await lootboard.board_generator(1)
+        channel = await bot.fetch_channel(1210765311498788865)
+        await channel.send("Lootboard test", embed=embed)
+
     bot.start()
 
 if __name__ == "__main__":
     print("---------------------------------")
     print("-----  DropTracker.io Core  -----")
-    print("- Version:" + os.getenv("VERSION"))
-    print("- Startup time: " + str(datetime.now()))
+    print("---------------------------------")
+    print("- Version: " + os.getenv("VERSION"))
+    print("- Startup time: " + datetime.now().strftime("%H:%M"))
+    print("---------------------------------")
+    print("----------- @joelhalen ----------")
     print("---------------------------------")
     run_discord_bot()
     print("--- Ready to process incoming events... ")

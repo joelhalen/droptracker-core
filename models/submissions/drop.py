@@ -37,6 +37,5 @@ def after_drop_insert(mapper, connection, target: Drop):
     """Synchronous event handler for drop insertions"""
     print(f"Drop {target.drop_id} created successfully")
     player_cache = get_player_cache(target.player_id)
-    player_cache.update_player_stats(target)
-    # player_cache.rebuild_cache_sync()  # Use sync version
+    player_cache.rebuild_cache_sync()  # Use sync version instead
     print(f"Player stats updated for player {target.player_id}")

@@ -30,6 +30,7 @@ def get_partition(date: Optional[datetime] = None) -> Tuple[int, str]:
 
 def get_current_partition() -> int:
     numeric_partition, _ = get_partition()
+    print("Returning numeric partition:", numeric_partition)
     return numeric_partition
 
 async def get_command_id(bot: interactions.Client, command_name: str):

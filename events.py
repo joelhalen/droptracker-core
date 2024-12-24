@@ -104,7 +104,7 @@ async def on_bot_ready(event: Startup):
     bot: interactions.Client = event.bot
     bot.load_extension("cogs.commands.general")
     bot.load_extension("cogs.commands.admin")
-    print("Bot is ready")
+    logger.info("on_bot_ready", f"{bot.user.username} is ready with ID {bot.user.id}")
     metrics = MetricsTracker()
     await metrics.initialize()
     # Start the stats printing task

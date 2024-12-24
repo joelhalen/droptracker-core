@@ -31,6 +31,7 @@ class Logger:
                 timestamp=int(time.time())
             )
             session.add(log_entry)
+            print(f"[{level}] {source}: {message}")
             session.commit()
         except Exception as e:
             print(f"Failed to write log to database: {e}")

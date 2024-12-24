@@ -13,71 +13,88 @@ from dotenv import load_dotenv
 load_dotenv()
 
 logger = Logger()
-default_batch_size = os.getenv("BATCH_SIZE", 5)
+default_batch_size = int(os.getenv("BATCH_SIZE", 5))
 
 class DropProcessor:
     def __init__(self, batch_size: int = default_batch_size):
         self.batch_size = batch_size
         self.pending_drops: Dict[int, deque] = {}  # player_id -> deque of drops
+        self.session = session
     
     async def process_drop(self, embed: interactions.Embed, player_data: Player):
-        """Process a single drop and add it to the batch queue"""
-        logger.info("process_drop", f"Processing drop for player {player_data.player_id}")
         try:
-            logger.info("process_drop", f"Parsing embed for player {player_data.player_id}")
+            player = self.session.merge(player_data)
+            
             drop_data = await self._parse_embed(embed)
             if not drop_data:
-                logger.error("process_drop", f"Failed to parse embed for player {player_data.player_id}")
                 return
                 
-            # Initialize queue for this player if it doesn't exist
-            if player_data.player_id not in self.pending_drops:
-                self.pending_drops[player_data.player_id] = deque(maxlen=self.batch_size)
-                logger.info("process_drop", f"Initialized queue for player {player_data.player_id}")
+            if player.player_id not in self.pending_drops:
+                self.pending_drops[player.player_id] = deque(maxlen=self.batch_size)
+            # Convert values and create drop
+            try:
+                drop = Drop(
+                    item_id=int(drop_data['item_id']),
+                    value=int(drop_data['value']),
+                    quantity=int(drop_data['quantity']),
+                    npc_id=int(drop_data['npc_id']),
+                    player_id=int(player.player_id),
+                    authed=1,
+                    partition=get_current_partition(),
+                    image_url=embed.image.url if embed.image else None
+                )
+                print("Drop created:", drop)
+                
+                self.pending_drops[player.player_id].append(drop)
 
-            # Add drop to queue
-            drop = Drop(
-                item_id=drop_data['item_id'],
-                value=drop_data['value'],
-                quantity=drop_data['quantity'],
-                npc_id=drop_data['npc_id'],
-                player_id=player_data.player_id,
-                source_type=drop_data['source_type'],
-                authed=True,
-                partition=get_current_partition(),
-            )
-            
-            self.pending_drops[player_data.player_id].append(drop)
-            logger.info("process_drop", f"Added drop to queue for player {player_data.player_id}")
-            # Process batch if we've reached batch size
-            if len(self.pending_drops[player_data.player_id]) >= self.batch_size:
-                await self._process_batch(player_data.player_id)
-                logger.info("process_drop", f"Processed batch for player {player_data.player_id}")
+                if len(self.pending_drops[player.player_id]) >= self.batch_size:
+                    await self._process_batch(player.player_id)
+
+            except Exception as e:
+                logger.error("process_drop", 
+                    f"Drop creation error: {str(e)}. "
+                    f"Player ID: {player.player_id} (type: {type(player.player_id)})")
+                return
+
         except Exception as e:
-            logger.error("process_drop", f"Error processing drop: {e}")
+            logger.error("process_drop", f"Error processing drop: {str(e)}")
+            self.session.rollback()
     
     async def _parse_embed(self, embed: interactions.Embed) -> Dict:
         """Parse embed fields into drop data"""
         drop_data = {}
         
+        
         for field in embed.fields:
-            if field.name == "source":
-                npc_name = field.value
-                npc_id = await get_npc_id(npc_name)
-                if not npc_id:
-                    return None
-                drop_data['npc_id'] = npc_id
-            elif field.name == "id":
-                drop_data['item_id'] = field.value
-            elif field.name == "value":
-                drop_data['value'] = field.value
-            elif field.name == "quantity":
-                drop_data['quantity'] = field.value
-            elif field.name == "type":
-                drop_data['source_type'] = field.value
-            elif field.name == "item":
-                drop_data['item_name'] = field.value
-        print("returning", drop_data)
+            match field.name:
+                case "source":
+                    npc_name = field.value
+                    npc_id = await get_npc_id(npc_name)
+                    if not npc_id:
+                        logger.error("parse_embed", f"Could not find NPC ID for {npc_name}")
+                        return None
+                    drop_data['npc_id'] = npc_id
+                case "id":
+                    drop_data['item_id'] = int(field.value)
+                case "value":
+                    drop_data['value'] = int(field.value)
+                case "quantity":
+                    drop_data['quantity'] = int(field.value)
+                case "type" if field.value in ["npc", "collection_log", "combat_achievement"]:
+                    drop_data['source_type'] = field.value
+                case "item":
+                    drop_data['item_name'] = field.value
+        
+        # Validate we have all required fields
+        required_fields = ['item_id', 'value', 'quantity', 'npc_id', 'source_type']
+        missing_fields = [field for field in required_fields if field not in drop_data]
+        
+        if missing_fields:
+            logger.error("parse_embed", 
+                f"Missing required fields: {missing_fields}. "
+                f"Parsed data: {drop_data}")
+            return None
+        
         return drop_data
     
     async def _process_batch(self, player_id: int):
@@ -89,19 +106,12 @@ class DropProcessor:
         self.pending_drops[player_id].clear()
         
         try:
-            session.add_all(drops_to_process)
-            session.commit()
-            
-            # Update player cache after successful batch insert
-            player_cache = get_player_cache(player_id)
-            await player_cache.rebuild_cache_sync()
-            
-            logger.info("process_batch", 
-                       f"Successfully processed batch of {len(drops_to_process)} drops for player {player_id}")
+            self.session.add_all(drops_to_process)
+            self.session.commit()
             
         except Exception as e:
             logger.error("process_batch", f"Error processing batch for player {player_id}: {e}")
-            session.rollback()
+            self.session.rollback()
     
     async def flush_all(self):
         """Process all remaining drops in the queues"""
