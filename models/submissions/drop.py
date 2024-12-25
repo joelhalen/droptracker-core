@@ -3,6 +3,7 @@ import asyncio
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import func, event
+from cogs.qualifier import check_drop
 from utils.misc import get_current_partition, get_player_cache
 from ..base import Base
 
@@ -25,7 +26,7 @@ class Drop(Base):
     value = Column(Integer)
     quantity = Column(Integer)
     image_url = Column(String(150), nullable=True)
-    authed = Column(Boolean, default=False)
+    plugin_version = Column(String(10), nullable=True)
     partition = Column(Integer, default=get_current_partition, index=True)
     
     player = relationship("Player", back_populates="drops")
@@ -38,4 +39,6 @@ def after_drop_insert(mapper, connection, target: Drop):
     print(f"Drop {target.drop_id} created successfully")
     player_cache = get_player_cache(target.player_id)
     player_cache.rebuild_cache_sync()  # Use sync version instead
+    check_drop(target)
+
     print(f"Player stats updated for player {target.player_id}")

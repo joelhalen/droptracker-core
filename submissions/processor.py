@@ -39,7 +39,7 @@ class DropProcessor:
                     quantity=int(drop_data['quantity']),
                     npc_id=int(drop_data['npc_id']),
                     player_id=int(player.player_id),
-                    authed=1,
+                    plugin_version=drop_data.get('plugin_version'),
                     partition=get_current_partition(),
                     image_url=embed.image.url if embed.image else None
                 )
@@ -84,6 +84,8 @@ class DropProcessor:
                     drop_data['source_type'] = field.value
                 case "item":
                     drop_data['item_name'] = field.value
+                case "p_v":
+                    drop_data['plugin_version'] = field.value
         
         # Validate we have all required fields
         required_fields = ['item_id', 'value', 'quantity', 'npc_id', 'source_type']

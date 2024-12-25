@@ -14,6 +14,7 @@ class PersonalBestEntry(Base):
     kill_time = Column(Integer, nullable=False)
     personal_best = Column(Integer, nullable=False)
     new_pb = Column(Boolean, default=False)
+    plugin_version = Column(String(10), nullable=True)
     image_url = Column(String(150), nullable=True)
 
     player = relationship("Player", back_populates="pbs")

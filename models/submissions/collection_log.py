@@ -19,6 +19,7 @@ class CollectionLogEntry(Base):
     reported_slots = Column(Integer)
     image_url = Column(String(255), nullable=True)
     date_added = Column(DateTime, index=True, default=func.now())
+    plugin_version = Column(String(10), nullable=True)
     date_updated = Column(DateTime, onupdate=func.now(), default=func.now())
 
     player = relationship("Player", back_populates="clogs")

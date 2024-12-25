@@ -120,3 +120,11 @@ async def fetch_group_members(wom_group_id: int):
     except Exception as e:
         print("Couldn't find WOM group members... Error:", e)
         return []
+
+async def fetch_player_groups(username: str):
+    """ Fetch a list of groups a player is in """
+    await client.start()
+    await limiter.wait()
+    result = await client.players.get_group_memberships(username=username)
+    response = result.unwrap()
+    return [result['group']['id'] for result in response]

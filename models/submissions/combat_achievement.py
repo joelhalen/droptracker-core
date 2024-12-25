@@ -14,6 +14,7 @@ class CombatAchievementEntry(Base):
     player_id = Column(Integer, ForeignKey('players.player_id'))
     task_name = Column(String(255), nullable=False)
     image_url = Column(String(255), nullable=True)
+    plugin_version = Column(String(10), nullable=True)
     date_added = Column(DateTime, index=True, default=func.now())
 
     player = relationship("Player", back_populates="cas")
