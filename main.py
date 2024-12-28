@@ -11,6 +11,7 @@ from utils.message_builder import create_metrics_embed, generate_lootboard_embed
 import multiprocessing
 from hypercorn.asyncio import serve
 from cogs.images import lootboard
+from utils.bot_instance import bot_manager
 
 
 load_dotenv()
@@ -22,6 +23,8 @@ def run_discord_bot():
         bot = interactions.Client(token=os.getenv("DEV_DISCORD_TOKEN"), intents=intents)
     else:
         bot = interactions.Client(token=os.getenv("DISCORD_TOKEN"), intents=intents)
+
+    bot_manager.set_bot(bot)
 
     @bot.listen(MessageCreate)
     async def on_message_create(e: MessageCreate):

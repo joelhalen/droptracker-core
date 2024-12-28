@@ -2,8 +2,12 @@
 import asyncio
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, func, event
 from sqlalchemy.orm import relationship
+from typing import TYPE_CHECKING
 
-from cache.player_stats import PlayerStatsCache
+if TYPE_CHECKING:
+    from cache.player_stats import PlayerStatsCache
+    from models.submissions.drop import Drop
+
 from utils.misc import get_player_cache
 from ..base import Base
 from ..associations import user_group_association

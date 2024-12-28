@@ -1,10 +1,15 @@
 import time
 import interactions
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple, TYPE_CHECKING
+from utils import wiseoldman
 from utils.logger import Logger
+from models.base import session
 
 logger = Logger()
+
+if TYPE_CHECKING:
+    from models import Player, User, ItemList
 
 def get_player_cache(player_id: int):
     """
@@ -86,3 +91,20 @@ def are_names_equivalent(name1: str, name2: str) -> bool:
     norm2 = name2.replace('_', ' ').replace('-', ' ')
     
     return norm1.strip() == norm2.strip()
+
+def get_item_name(item_id: int) -> str:
+    return session.query(ItemList).filter(ItemList.item_id == item_id).first().item_name
+
+def build_wiki_url(item_name: str) -> str:
+    item_name = item_name.replace(" ", "_")
+    return f"https://oldschool.runescape.wiki/w/{item_name}"
+
+async def get_group_player_ids(group_wom_id: int, as_player_ids: bool = False) -> List[int]:
+    """
+        Get a list of player WiseOldMan IDs for a specific group
+    """
+    if as_player_ids:
+        return [player.player_id for player in session.query(Player.player_id).filter(Player.wom_id == group_wom_id).all()]
+    else:
+        return await wiseoldman.fetch_group_members(group_wom_id)
+        

@@ -2,7 +2,6 @@ import os
 import asyncio
 from asynciolimiter import Limiter
 from dotenv import load_dotenv
-from models import Player
 from models.base import session
 import wom
 
@@ -96,6 +95,8 @@ async def fetch_group_members(wom_group_id: int):
     Returns a list of WiseOldMan Player IDs 
     for members of a specified group 
     """
+    
+    from models.users.player import Player  
     #print("Fetching group members for ID:", wom_group_id)
     user_list = []
     

@@ -3,21 +3,23 @@ import time
 from sqlalchemy import func
 from cache import redis_client
 from models.base import session
-from models.submissions import Drop
-from typing import Dict, Optional, List, TYPE_CHECKING
+from models import Player
+from typing import Dict, Optional, List, TYPE_CHECKING, Tuple
 import json
 from utils.misc import get_partition
 from typing import TYPE_CHECKING
 from utils.logger import Logger
+import asyncio
+from models.submissions.drop import Drop
 
 logger = Logger()
 
-if TYPE_CHECKING:
-    from models.submissions.drop import Drop
 
 class PlayerStatsCache:
     _instances = {}  # Class variable to store player-specific instances
     
+    if TYPE_CHECKING:
+        from models import Drop
     @classmethod
     def get_instance(cls, player_id: int) -> 'PlayerStatsCache':
         """Get or create a PlayerStatsCache instance for a specific player"""
@@ -78,7 +80,7 @@ class PlayerStatsCache:
         
         await pipe.execute()
     
-    async def remove_drop(self, drop: Drop) -> None:
+    async def remove_drop(self, drop: 'Drop') -> None:
         """Remove a specific drop from both total and partition-specific cache"""
         total_keys = self._get_cache_keys()
         partition_keys = self._get_cache_keys(drop.date_added)
@@ -197,7 +199,7 @@ class PlayerStatsCache:
         # Set TTL for total keys
         for key in total_keys.values():
             pipe.expire(key, self.cache_ttl)
-        
+    
         await pipe.execute()
     
     async def get_player_stats(self, partition_date: Optional[datetime] = None) -> Optional[Dict]:
@@ -338,5 +340,56 @@ class PlayerStatsCache:
 class GroupStatsCache:
     def __init__(self):
         self.cache_ttl = 3600  # 1 hour cache TTL
+
+async def get_global_rankings(partition_date: Optional[datetime] = None) -> List[Tuple[int, int]]:
+    """
+    Get global rankings of all players based on their total loot value
+    
+    Returns:
+    List[Tuple[int, int]]: List of (player_id, total_value) sorted by total_value descending
+    """
+    if partition_date is None:
+        partition_date = datetime.now()
+        
+    # Get all player IDs from the database
+    players = session.query(Player.player_id).all()
+    player_totals = []
+    
+    # Gather all player stats concurrently
+    async def get_player_total(player_id: int) -> Tuple[int, int]:
+        cache = PlayerStatsCache(player_id)
+        stats = await cache.get_player_stats(partition_date)
+        if stats and "total" in stats:
+            return (player_id, stats["total"]["total_value"])
+        return (player_id, 0)
+    
+    # Use asyncio.gather to fetch all player stats concurrently
+    tasks = [get_player_total(player[0]) for player in players]
+    player_totals = await asyncio.gather(*tasks)
+    
+    # Sort by total value descending
+    rankings = sorted(player_totals, key=lambda x: x[1], reverse=True)
+    return rankings
+
+async def get_player_rank(player_id: int, partition_date: Optional[datetime] = None) -> Tuple[int, int, int]:
+    """
+    Get a player's global rank based on their total loot value
+    
+    Args:
+        player_id: The player's ID
+        partition_date: Optional date to get rankings for specific month
+        
+    Returns:
+        Tuple[int, int, int]: (rank, total_value, total_players)
+    """
+    rankings = await get_global_rankings(partition_date)
+    
+    # Find player's position in rankings
+    for rank, (ranked_id, value) in enumerate(rankings, 1):
+        if ranked_id == player_id:
+            return (rank, value, len(rankings))
+            
+    # Player not found
+    return (len(rankings), 0, len(rankings))
 
 

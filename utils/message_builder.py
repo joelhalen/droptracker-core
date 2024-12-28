@@ -3,7 +3,9 @@ from typing import Dict, List, Optional
 import interactions
 from interactions import Embed, Button, ButtonStyle, InteractionType, Message, SlashContext
 
-from models import Log
+from utils.rankings import get_global_rankings
+from models import Log, Drop, Player, User
+from utils.misc import build_wiki_url, get_group_player_ids, get_item_name, get_player_cache
 from utils.num import format_number
 
 
@@ -175,4 +177,68 @@ async def generate_lootboard_embed(total_players: int) -> Embed:
     embed.add_field(name="Sign up!", value=f"Use the `/claim-rsn` command & install [our plugin](https://www.github.com/joelhalen/droptracker-plugin)", inline=True)
     embed.set_footer(text="Powered by the DropTracker | https://www.droptracker.io/")
     embed.set_thumbnail(url="https://joelhalen.github.io/droptracker-small.gif")
+    return embed
+
+async def generate_drop_embed(group_wom_id: int, drop: Drop) -> Embed:
+    """Generate a drop embed with player and group statistics"""
+    # Get player info
+    player: Player = drop.player
+    raw_display_name = player.player_name
+    current_month_str = datetime.now().strftime("%B")
+    drop_partition = drop.partition
+    
+    # Handle Discord user if linked
+    if player.user:
+        user: User = player.user
+        display_name = f"<@{user.discord_id}>"
+        raw_display_name = user.username
+        
+    # Get item info and build base embed
+    item_name = get_item_name(drop.item_id)
+    embed = build_default(
+        title=f"[{item_name}]({build_wiki_url(item_name)})", 
+        description=f"G/E Value: `{format_number(drop.value * drop.quantity)}`"
+    )
+    embed.set_author(name=raw_display_name, icon_url="https://joelhalen.github.io/droptracker-small.gif")
+    
+    # Get player stats
+    player_cache = get_player_cache(player.player_id)
+    player_monthly = await player_cache.get_player_stats(drop_partition)
+    player_monthly_total = player_monthly['total'].get("total_value", 0)
+    
+    # Get group stats
+    group_members = await get_group_player_ids(group_wom_id, as_player_ids=True)
+    player_totals = []
+    total_group_value = 0
+    
+    # Calculate group totals and rankings
+    for player_id in group_members:
+        member_cache = get_player_cache(player_id)
+        member_monthly = await member_cache.get_player_stats(drop_partition)
+        member_total = member_monthly['total'].get("total_value", 0)
+        player_totals.append(member_total)
+        total_group_value += member_total
+    
+    # Calculate rankings
+    player_rank = sorted(player_totals, reverse=True).index(player_monthly_total) + 1
+    global_rankings = await get_global_rankings(drop_partition)
+    global_rank = global_rankings.index(player.player_id) + 1
+    
+    # Format stats sections
+    player_stats = (
+        f"{current_month_str} total: `{format_number(player_monthly_total)}`\n"
+        f"Group Rank: `#{player_rank}`\n"
+        f"Global Rank: `#{global_rank}`"
+    )
+    
+    group_stats = (
+        f"Group total: `{format_number(total_group_value)}`\n"
+        f"Tracked players: `{len(group_members)}`"
+    )
+    
+    # Add fields to embed
+    embed.add_field(name="Player Stats", value=player_stats, inline=True)
+    embed.add_field(name="Group Stats", value=group_stats, inline=True)
+    embed.add_field(name="Drop Quantity", value=f"`{format_number(drop.quantity)}`", inline=True)
+    
     return embed

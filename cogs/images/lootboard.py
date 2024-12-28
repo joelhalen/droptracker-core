@@ -10,7 +10,7 @@ import aiohttp
 from PIL import Image, ImageFont, ImageDraw
 from interactions import Embed
 from utils.message_builder import generate_lootboard_embed
-from utils.misc import get_partition, get_player_cache
+from utils.misc import get_group_player_ids, get_partition, get_player_cache
 from cache import redis_client
 from utils import logger, wiseoldman
 from utils.num import format_number
@@ -337,11 +337,6 @@ async def get_lootboard_data(player_ids: List[int], partition: int = None) -> Di
         'top_players': top_players
     }
 
-async def get_group_player_ids(group_wom_id: int) -> List[int]:
-    """
-        Get a list of player IDs for a specific group
-    """
-    return await wiseoldman.fetch_group_members(group_wom_id)
 
 
 async def board_generator(group_wom_id, partition: int = None) -> str:

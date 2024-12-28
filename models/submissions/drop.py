@@ -3,7 +3,6 @@ import asyncio
 from sqlalchemy import Column, Integer, ForeignKey, DateTime, Boolean, String
 from sqlalchemy.orm import relationship
 from sqlalchemy import func, event
-from cogs.qualifier import check_drop
 from utils.misc import get_current_partition, get_player_cache
 from ..base import Base
 
@@ -34,11 +33,6 @@ class Drop(Base):
 
 
 @event.listens_for(Drop, 'after_insert')
-def after_drop_insert(mapper, connection, target: Drop):
-    """Synchronous event handler for drop insertions"""
-    print(f"Drop {target.drop_id} created successfully")
-    player_cache = get_player_cache(target.player_id)
-    player_cache.rebuild_cache_sync()  # Use sync version instead
-    check_drop(target)
-
-    print(f"Player stats updated for player {target.player_id}")
+def after_drop_insert(mapper, connection, target):
+    from cogs.qualifier import check_drop
+    asyncio.create_task(check_drop(target))
